@@ -1,0 +1,22 @@
+package dto
+
+type HHResponse struct {
+	Items []Vacancy `json:"items"`
+}
+
+type Vacancy struct {
+	Id     string `json:"id"`
+	Name   string `json:"name"`
+	Area   Area   `json:"area"`
+	Salary Salary `json:"salary"`
+	Url    string `json:"alternate_url"`
+}
+
+type Area struct {
+	Name string `json:"name"`
+}
+
+type Salary struct {
+	From int `json:"from"`
+	To   int `json:"to"`
+}

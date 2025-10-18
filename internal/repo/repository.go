@@ -39,6 +39,23 @@ func (repo *Repository) CreateOrUpdateSubscribe(userId int, subscribeQuery strin
 	return sub, nil
 }
 
+func (repo *Repository) Subscriptions() ([]models.Subscription, error) {
+	var subscriptions []models.Subscription
+
+	query := `
+		SELECT search_text, telegram_id
+		FROM subscriptions
+	`
+
+	err := repo.db.Select(&subscriptions, query)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get subscriptions from db: %w", err)
+	}
+
+	return subscriptions, nil
+}
+
 func (repo *Repository) Subscription(userId int) (models.Subscription, error) {
 	var subscription models.Subscription
 

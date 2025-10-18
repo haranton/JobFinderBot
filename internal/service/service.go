@@ -21,6 +21,16 @@ func NewService(repo *repo.Repository, fetcher *fetcher.Fetcher) *Service {
 	}
 }
 
+func (s *Service) Subscriptions() ([]models.Subscription, error) {
+
+	subscriptions, err := s.repo.Subscriptions()
+	if err != nil {
+		return nil, err
+	}
+
+	return subscriptions, nil
+}
+
 func (s *Service) SearchVacancies(query string, userId int) ([]dto.Vacancy, error) {
 
 	hhVacancies, err := s.fetcher.Vacancies(query)
@@ -110,8 +120,3 @@ func sortVacancies(vacancies []dto.Vacancy, userVacancies []models.UserVacancy) 
 
 	return filtered
 }
-
-// func (s *Service) MarkVacancySent(userID int, vacancyID string) error {
-// 	// Бизнес-логика отметки отправки
-// 	return s.userVacancyRepo.MarkSent(userID, vacancyID)
-// }

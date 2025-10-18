@@ -13,6 +13,7 @@ import (
 	"tgbot/internal/handler"
 	"tgbot/internal/logger"
 	"tgbot/internal/repo"
+	"tgbot/internal/sender"
 	"tgbot/internal/service"
 	"time"
 )
@@ -54,12 +55,17 @@ func main() {
 
 	token := "8279903094:AAHzqWq_Xx6-CqYLfa9aiedrPx3FJx_sFC4"
 	bot := &bot.Bot{Token: token}
+
+	if err := bot.RegisterCommands(); err != nil {
+		log.Fatalf("failed to register bot commands: %v", err)
+	}
+
 	repo := repo.NewRepository(ConnectDb)
 	service := service.NewService(repo, fetcher)
 	handler := handler.NewHandler(service, bot)
 
-	// sender := sender.Sender{}
-	// sender.Start()
+	sender := sender.NewSender(service, bot)
+	sender.Start()
 
 	offset := 0
 

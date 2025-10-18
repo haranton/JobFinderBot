@@ -1,6 +1,8 @@
 package bot
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -14,8 +16,7 @@ type BotClient interface {
 }
 
 type Bot struct {
-	Token  string
-	client *http.Client
+	Token string
 }
 
 func (b *Bot) SendMessage(chatID int, text string) error {
@@ -25,4 +26,32 @@ func (b *Bot) SendMessage(chatID int, text string) error {
 
 	_, err := http.PostForm(fmt.Sprintf("%s%s/sendMessage", telegramAPI, b.Token), params)
 	return err
+}
+
+func (b *Bot) RegisterCommands() error {
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/setMyCommands", b.Token)
+
+	commands := []map[string]string{
+		{"command": "start", "description": "Регистрация пользователя"},
+		{"command": "help", "description": "Список команд"},
+	}
+
+	body, err := json.Marshal(map[string]interface{}{
+		"commands": commands,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal commands: %w", err)
+	}
+
+	resp, err := http.Post(url, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("telegram API returned status %d", resp.StatusCode)
+	}
+
+	return nil
 }

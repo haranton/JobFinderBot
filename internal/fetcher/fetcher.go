@@ -27,7 +27,8 @@ func (f *Fetcher) Vacancies(userInput string) ([]dto.Vacancy, error) {
 
 	params := url.Values{}
 	params.Add("text", searchQuery)
-	params.Add("per_page", "100") // максимум 100 вакансий за один запрос
+	params.Add("per_page", "100")
+	params.Add("period", "1")
 
 	allVacancies := make([]dto.Vacancy, 0)
 	page := 0

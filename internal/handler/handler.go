@@ -9,8 +9,6 @@ import (
 	"tgbot/internal/service"
 )
 
-const token = "8279903094:AAHzqWq_Xx6-CqYLfa9aiedrPx3FJx_sFC4"
-
 type Handler struct {
 	bot     *bot.Bot
 	service *service.Service
@@ -35,8 +33,8 @@ func (h *Handler) HandleMessage(userId int, text string) {
 		h.handleFind(userId, text)
 	case strings.HasPrefix(text, "/subscribe"):
 		h.handleSubscribe(userId, text)
-	// case text == "/help":
-	// 	handleHelp(userId)
+	case text == "/help":
+		h.handleHelp(userId)
 	default:
 		h.handleUnknown(userId)
 	}
@@ -102,5 +100,23 @@ func (h *Handler) handleFind(userId int, text string) {
 
 func (h *Handler) handleUnknown(userId int) {
 	log.Printf("unknown command")
-	h.bot.SendMessage(userId, "Ошибка при отправке сообщения")
+	h.bot.SendMessage(userId, "не знакомая команда, посмотрите список команд /help")
+}
+
+func (h *Handler) handleHelp(userId int) {
+	helpText := `*Список доступных команд:*
+
+		/start — регистрация пользователя  
+		/find <запрос> — поиск вакансий по ключевым словам  
+		/subscribe <запрос> — подписка на вакансии  
+		/help — показать это сообщение  
+
+		*Примеры:*
+		/find golang удаленно Ижевск
+		/subscribe python developer
+		`
+
+	if err := h.bot.SendMessage(userId, helpText); err != nil {
+		log.Println("error sending help message:", err)
+	}
 }

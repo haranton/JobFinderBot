@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"tgbot/internal/config"
 
 	"os"
@@ -34,14 +35,20 @@ func RunMigrations(cfg *config.Config, logger *slog.Logger) {
 		os.Exit(1)
 	}
 
-	basepath := cfg.MIGRATIONS_PATH
-	if basepath == "" {
-		logger.Error("MIGRATIONS_PATH is not set in the configuration")
+	ex, _ := os.Executable()
+	basePath := filepath.Dir(ex)
+
+	migrationPath := filepath.Join(basePath, "../../migrations")
+	if _, err := os.Stat(migrationPath); os.IsNotExist(err) {
+		migrationPath = filepath.Join(basePath, "../migrations")
+	}
+	if _, err := os.Stat(migrationPath); os.IsNotExist(err) {
+		logger.Error("migrations folder not found", slog.String("checked_path", migrationPath))
 		os.Exit(1)
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
-		"file://"+basepath,
+		"file://"+migrationPath,
 		"postgres", driver,
 	)
 	if err != nil {

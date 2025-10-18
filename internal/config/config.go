@@ -3,7 +3,7 @@ package config
 import (
 	"log"
 	"os"
-	"strconv"
+	"path/filepath"
 
 	"github.com/joho/godotenv"
 )
@@ -25,11 +25,34 @@ type Config struct {
 
 func LoadConfig() *Config {
 
-	if err := godotenv.Load(); err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
+	ex, err := os.Executable()
+	if err != nil {
+		log.Fatal(err)
+	}
+	exPath := filepath.Dir(ex)
+
+	// Возможные пути к .env
+	paths := []string{
+		filepath.Join(exPath, "../../.env"), // запуск из /cmd
+		filepath.Join(exPath, "../.env"),    // запуск из корня
+		".env",                              // fallback
 	}
 
-	redisDb, _ := strconv.Atoi(os.Getenv("REDIS_DB"))
+	loaded := false
+	for _, p := range paths {
+		if _, err := os.Stat(p); err == nil {
+			err = godotenv.Load(p)
+			if err != nil {
+				log.Fatalf("Ошибка загрузки .env: %v", err)
+			}
+			loaded = true
+			break
+		}
+	}
+
+	if !loaded {
+		log.Println(" .env файл не найден — использую переменные окружения из системы")
+	}
 
 	return &Config{
 		AppPort:         os.Getenv("APP_PORT"),
@@ -43,6 +66,5 @@ func LoadConfig() *Config {
 		REDIS_HOST:      os.Getenv("REDIS_HOST"),
 		REDIS_PORT:      os.Getenv("REDIS_PORT"),
 		REDIS_PASSWORD:  os.Getenv("REDIS_PASSWORD"),
-		REDIS_DB:        redisDb,
 	}
 }

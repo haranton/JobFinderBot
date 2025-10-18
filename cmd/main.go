@@ -6,17 +6,18 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"tgbot/internal/bot"
 	"tgbot/internal/config"
 	"tgbot/internal/db"
 	"tgbot/internal/fetcher"
 	"tgbot/internal/handler"
 	"tgbot/internal/logger"
-	"tgbot/internal/sender"
+	"tgbot/internal/repo"
+	"tgbot/internal/service"
 	"time"
 )
 
 const telegramAPI = "https://api.telegram.org/bot"
-const baseUrl = "https://api.hh.ru/vacancies"
 
 type Update struct {
 	UpdateID int `json:"update_id"`
@@ -33,7 +34,6 @@ type Update struct {
 }
 
 func main() {
-
 	//config
 	config := config.LoadConfig()
 	//Logger
@@ -47,18 +47,21 @@ func main() {
 	// migrations
 	db.RunMigrations(config, logger)
 
-	token := "8279903094:AAHzqWq_Xx6-CqYLfa9aiedrPx3FJx_sFC4"
-
-	offset := 0
-
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
-
 	fetcher := fetcher.NewFetcher(client)
-	handler := handler.NewHandler(fetcher)
-	sender := sender.Sender{}
-	sender.Start()
+
+	token := "8279903094:AAHzqWq_Xx6-CqYLfa9aiedrPx3FJx_sFC4"
+	bot := &bot.Bot{Token: token}
+	repo := repo.NewRepository(ConnectDb)
+	service := service.NewService(repo, fetcher)
+	handler := handler.NewHandler(service, bot)
+
+	// sender := sender.Sender{}
+	// sender.Start()
+
+	offset := 0
 
 	for {
 		updates, err := getUpdates(token, offset)

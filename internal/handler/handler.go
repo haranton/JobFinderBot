@@ -5,6 +5,7 @@ import (
 	"log"
 	"strings"
 	"tgbot/internal/bot"
+	"tgbot/internal/models"
 	"tgbot/internal/service"
 )
 
@@ -22,48 +23,84 @@ func NewHandler(service *service.Service, bot *bot.Bot) *Handler {
 	}
 }
 
-func (h *Handler) HandleMessage(chatID int, text string) {
+func (h *Handler) HandleMessage(userId int, text string) {
 
 	text = strings.TrimSpace(text)
 
 	// Определяем команду
 	switch {
 	case text == "/start":
-		h.handleStart(chatID)
+		h.handleStart(userId)
 	case strings.HasPrefix(text, "/find"):
-		h.handleFind(chatID, text)
+		h.handleFind(userId, text)
 	case strings.HasPrefix(text, "/subscribe"):
-		// handleSubscribe(chatID, text)
+		h.handleSubscribe(userId, text)
 	// case text == "/help":
-	// 	handleHelp(chatID)
+	// 	handleHelp(userId)
 	default:
-		h.handleUnknown(chatID)
+		h.handleUnknown(userId)
 	}
 }
 
-func (h *Handler) handleStart(chatId int) {
+func (h *Handler) handleSubscribe(userId int, subscribeCommandText string) {
+
+	subscribeText := strings.TrimPrefix(subscribeCommandText, "/subscribe")
 	// сохраняем в бд user и chat id
+	subscribe, err := h.service.RegisterSubscribe(userId, subscribeText)
+
+	if err != nil {
+		log.Println(err)
+		h.bot.SendMessage(userId, "Ошибка регистрации подписки")
+		return
+	}
+
+	msg := fmt.Sprintf("Подписка успешно зарегистрирована, данные подписки: %v", subscribe)
+	if err = h.bot.SendMessage(userId, msg); err != nil {
+		log.Println("error send message")
+	}
+
 }
 
-func (h *Handler) handleFind(chatId int, text string) {
+func (h *Handler) handleStart(userId int) {
+	// сохраняем в бд user и chat id
+	user, err := h.service.RegisterUser(userId)
+	if err != nil && user != (models.User{}) {
+		log.Println(err)
+		h.bot.SendMessage(userId, "Пользователь уже зарегистрирован")
+		return
+	}
+	if err != nil {
+		log.Println(err)
+		h.bot.SendMessage(userId, "Ошибка регистрации пользователя")
+		return
+	}
+
+	msg := fmt.Sprintf("пользователь успешно зарегистрирован, данные пользователя: %v", user)
+	if err = h.bot.SendMessage(userId, msg); err != nil {
+		log.Println("error send message")
+	}
+
+}
+
+func (h *Handler) handleFind(userId int, text string) {
 
 	query := strings.TrimPrefix(text, "/find")
 
-	vacancies, err := h.service.SearchVacancies(query, chatId)
+	vacancies, err := h.service.SearchVacancies(query, userId)
 	if err != nil {
 		log.Printf("Error getting vacancies: %v", err)
-		h.bot.SendMessage(chatId, "Ошибка при отправке сообщения")
+		h.bot.SendMessage(userId, "Ошибка при отправке сообщения")
 	} else {
 		for _, vac := range vacancies {
 			msg := fmt.Sprintf("%s\n%s\nЗП: %d-%d\n%s",
 				vac.Name, vac.Area.Name, vac.Salary.From, vac.Salary.To, vac.Url)
-			h.bot.SendMessage(chatId, msg)
+			h.bot.SendMessage(userId, msg)
 		}
 	}
 
 }
 
-func (h *Handler) handleUnknown(chatId int) {
+func (h *Handler) handleUnknown(userId int) {
 	log.Printf("unknown command")
-	h.bot.SendMessage(chatId, "Ошибка при отправке сообщения")
+	h.bot.SendMessage(userId, "Ошибка при отправке сообщения")
 }

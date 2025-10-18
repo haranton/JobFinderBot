@@ -1,6 +1,5 @@
 CREATE TABLE IF NOT EXISTS users (
     telegram_id BIGINT PRIMARY KEY,
-    chat_id BIGINT NOT NULL UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -19,6 +18,6 @@ CREATE TABLE IF NOT EXISTS user_vacancies (
 CREATE TABLE IF NOT EXISTS subscriptions (
     id SERIAL PRIMARY KEY,
     search_text TEXT NOT NULL,
-    telegram_id BIGINT REFERENCES users(telegram_id) ON DELETE CASCADE,
+    telegram_id BIGINT UNIQUE REFERENCES users(telegram_id) ON DELETE CASCADE,
     is_active BOOLEAN DEFAULT TRUE
 );

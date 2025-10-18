@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"strconv"
 	"tgbot/internal/dto"
 	"tgbot/internal/fetcher"
@@ -20,7 +21,7 @@ func NewService(repo *repo.Repository, fetcher *fetcher.Fetcher) *Service {
 	}
 }
 
-func (s *Service) SearchVacancies(query string, chatId int) ([]dto.Vacancy, error) {
+func (s *Service) SearchVacancies(query string, userId int) ([]dto.Vacancy, error) {
 
 	hhVacancies, err := s.fetcher.Vacancies(query)
 	if err != nil {
@@ -37,18 +38,59 @@ func (s *Service) SearchVacancies(query string, chatId int) ([]dto.Vacancy, erro
 		vacancies = append(vacancies, vacancy)
 	}
 	//проверяем повторящие элементы
-	vakanciesUser, err := s.repo.GetUserVacancies(chatId)
+	vakanciesUser, err := s.repo.GetUserVacancies(userId)
 	if err != nil {
 		return nil, err
 	}
 
 	hhVacancies = sortVacancies(hhVacancies, vakanciesUser)
 
-	if err := s.repo.SaveVacancies(chatId, vacancies); err != nil {
+	if err := s.repo.SaveVacancies(userId, vacancies); err != nil {
 		return nil, err
 	}
 
 	return hhVacancies, nil
+}
+
+func (s *Service) RegisterSubscribe(userId int, subscribeQuery string) (models.Subscription, error) {
+
+	user, err := s.repo.GetUser(userId)
+
+	if err != nil {
+		return models.Subscription{}, err
+	}
+
+	if user == (models.User{}) {
+		return models.Subscription{}, fmt.Errorf("user dont find: user id: %v", userId)
+	}
+
+	subscribe, err := s.repo.CreateOrUpdateSubscribe(userId, subscribeQuery)
+	if err != nil {
+		return models.Subscription{}, err
+	}
+
+	return subscribe, nil
+
+}
+
+func (s *Service) RegisterUser(userId int) (models.User, error) {
+	user, err := s.repo.GetUser(userId)
+
+	if err != nil {
+		return models.User{}, err
+	}
+
+	if user != (models.User{}) {
+		return user, fmt.Errorf("user already exist")
+	}
+
+	user, err = s.repo.CreateUser(userId)
+	if err != nil {
+		return models.User{}, err
+	}
+
+	return user, nil
+
 }
 
 func sortVacancies(vacancies []dto.Vacancy, userVacancies []models.UserVacancy) []dto.Vacancy {

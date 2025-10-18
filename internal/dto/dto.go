@@ -2,6 +2,7 @@ package dto
 
 type HHResponse struct {
 	Items []Vacancy `json:"items"`
+	Pages int       `json:"pages"`
 }
 
 type Vacancy struct {

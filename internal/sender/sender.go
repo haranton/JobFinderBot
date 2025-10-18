@@ -2,17 +2,17 @@ package sender
 
 import (
 	"log"
-	"tgbot/internal/fetcher"
+	"tgbot/internal/service"
 	"time"
 )
 
 type Sender struct {
-	fetcher *fetcher.Fetcher
+	service *service.Service
 }
 
-func NewSender(fetcher *fetcher.Fetcher) *Sender {
+func NewSender(service *service.Service) *Sender {
 	return &Sender{
-		fetcher: fetcher,
+		service: service,
 	}
 }
 
@@ -22,7 +22,7 @@ func (s *Sender) Start() {
 
 	go func() {
 		for range ticker.C {
-			// log.Println("sender send message")
+			log.Println("sender send message")
 			// s.fetcher.Vacancies()
 		}
 	}()

@@ -5,7 +5,6 @@ import "time"
 // Таблица users
 type User struct {
 	TelegramID int64     `db:"telegram_id" json:"telegram_id"`
-	ChatID     int64     `db:"chat_id" json:"chat_id"`
 	CreatedAt  time.Time `db:"created_at" json:"created_at"`
 }
 

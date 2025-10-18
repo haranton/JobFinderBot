@@ -11,7 +11,6 @@ import (
 )
 
 const baseUrl = "https://api.hh.ru/vacancies"
-const telegramAPI = "https://api.telegram.org/bot"
 
 type Fetcher struct {
 	client *http.Client
@@ -24,55 +23,52 @@ func NewFetcher(client *http.Client) *Fetcher {
 }
 
 func (f *Fetcher) Vacancies(userInput string) ([]dto.Vacancy, error) {
-
 	searchQuery := buildSearchQuery(userInput)
 
 	params := url.Values{}
 	params.Add("text", searchQuery)
-	params.Add("per_page", "5")
+	params.Add("per_page", "100") // максимум 100 вакансий за один запрос
 
-	fullURL := baseUrl + "?" + params.Encode()
+	allVacancies := make([]dto.Vacancy, 0)
+	page := 0
 
-	req, err := http.NewRequest(http.MethodGet, fullURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+	for {
+		params.Set("page", fmt.Sprintf("%d", page))
+		fullURL := baseUrl + "?" + params.Encode()
+
+		req, err := http.NewRequest(http.MethodGet, fullURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create request: %w", err)
+		}
+
+		resp, err := f.client.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get response: %w", err)
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read response: %w", err)
+		}
+
+		var responseModel dto.HHResponse
+		if err = json.Unmarshal(body, &responseModel); err != nil {
+			return nil, fmt.Errorf("failed to parse response: %w", err)
+		}
+
+		// Добавляем вакансии из этой страницы
+		allVacancies = append(allVacancies, responseModel.Items...)
+
+		// Проверяем, последняя ли страница
+		if responseModel.Pages == 0 || page >= responseModel.Pages-1 {
+			break
+		}
+
+		page++
 	}
 
-	resp, err := f.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get response: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	var responseModel dto.HHResponse
-	if err = json.Unmarshal(body, &responseModel); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	return responseModel.Items, nil
-}
-
-// func (f *Fetcher) SendVacansies(userInput string) error{
-// 	vacansies, err := f.Vacancies(userInput)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	for vacansies
-// }
-
-func (f *Fetcher) SendMessage(token string, chatID int, text string) error {
-	params := url.Values{}
-	params.Add("chat_id", fmt.Sprintf("%d", chatID))
-	params.Add("text", text)
-
-	_, err := http.PostForm(fmt.Sprintf("%s%s/sendMessage", telegramAPI, token), params)
-	return err
+	return allVacancies, nil
 }
 
 func buildSearchQuery(userInput string) string {

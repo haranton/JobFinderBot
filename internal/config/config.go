@@ -17,10 +17,7 @@ type Config struct {
 	DBName          string
 	ENV             string
 	MIGRATIONS_PATH string
-	REDIS_HOST      string
-	REDIS_PORT      string
-	REDIS_PASSWORD  string
-	REDIS_DB        int
+	TOKEN           string
 }
 
 func LoadConfig() *Config {
@@ -63,8 +60,6 @@ func LoadConfig() *Config {
 		DBName:          os.Getenv("DB_NAME"),
 		ENV:             os.Getenv("ENV"),
 		MIGRATIONS_PATH: os.Getenv("MIGRATIONS_PATH"),
-		REDIS_HOST:      os.Getenv("REDIS_HOST"),
-		REDIS_PORT:      os.Getenv("REDIS_PORT"),
-		REDIS_PASSWORD:  os.Getenv("REDIS_PASSWORD"),
+		TOKEN:           os.Getenv("TOKEN"),
 	}
 }

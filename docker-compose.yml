@@ -1,15 +1,15 @@
 
 services:
 
-  # api:
-  #   build: .
-  #   container_name: api
-  #   env_file:
-  #     - .env
-  #   ports:
-  #     - "8080:8080"
-  #   depends_on:
-  #     - db
+  bot:
+    build: .
+    container_name: bot
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
 
   db:
     image: postgres:15

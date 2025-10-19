@@ -22,7 +22,7 @@ func NewSender(service *service.Service, bot *bot.Bot) *Sender {
 
 func (s *Sender) Start() {
 	log.Println("sender is start")
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(30 * time.Second)
 
 	go func() {
 		for range ticker.C {

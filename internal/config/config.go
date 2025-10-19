@@ -18,6 +18,7 @@ type Config struct {
 	ENV             string
 	MIGRATIONS_PATH string
 	TOKEN           string
+	DBHostProd      string
 }
 
 func LoadConfig() *Config {
@@ -55,6 +56,7 @@ func LoadConfig() *Config {
 		AppPort:         os.Getenv("APP_PORT"),
 		DBHost:          os.Getenv("DB_HOST"),
 		DBPort:          os.Getenv("DB_PORT"),
+		DBHostProd:      os.Getenv("DB_HOST_PROD"),
 		DBUser:          os.Getenv("DB_USER"),
 		DBPassword:      os.Getenv("DB_PASSWORD"),
 		DBName:          os.Getenv("DB_NAME"),

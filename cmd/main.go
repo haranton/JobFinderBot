@@ -53,8 +53,7 @@ func main() {
 	}
 	fetcher := fetcher.NewFetcher(client)
 
-	token := "8279903094:AAHzqWq_Xx6-CqYLfa9aiedrPx3FJx_sFC4"
-	bot := &bot.Bot{Token: token}
+	bot := &bot.Bot{Token: config.TOKEN}
 
 	if err := bot.RegisterCommands(); err != nil {
 		log.Fatalf("failed to register bot commands: %v", err)
@@ -70,7 +69,7 @@ func main() {
 	offset := 0
 
 	for {
-		updates, err := getUpdates(token, offset)
+		updates, err := getUpdates(config.TOKEN, offset)
 		if err != nil {
 			log.Println("error get updates")
 			continue

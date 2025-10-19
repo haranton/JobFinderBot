@@ -1,1 +1,3 @@
 .env
+cmd/tmp/main
+tmp/build-errors.log

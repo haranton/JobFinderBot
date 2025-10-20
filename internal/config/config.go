@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/joho/godotenv"
 )
@@ -19,6 +20,7 @@ type Config struct {
 	MIGRATIONS_PATH string
 	TOKEN           string
 	DBHostProd      string
+	WorkerCount     int
 }
 
 func LoadConfig() *Config {
@@ -52,6 +54,12 @@ func LoadConfig() *Config {
 		log.Println(" .env файл не найден — использую переменные окружения из системы")
 	}
 
+	workerCountString := os.Getenv("WORKER_COUNT")
+	workerCount, err := strconv.Atoi(workerCountString)
+	if err != nil {
+		log.Fatalf("failed to parce workerCount in integer, err: %w", err)
+	}
+
 	return &Config{
 		AppPort:         os.Getenv("APP_PORT"),
 		DBHost:          os.Getenv("DB_HOST"),
@@ -63,5 +71,6 @@ func LoadConfig() *Config {
 		ENV:             os.Getenv("ENV"),
 		MIGRATIONS_PATH: os.Getenv("MIGRATIONS_PATH"),
 		TOKEN:           os.Getenv("TOKEN"),
+		WorkerCount:     workerCount,
 	}
 }

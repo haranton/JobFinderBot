@@ -19,15 +19,12 @@ func NewRepository(db *sqlx.DB) *Repository {
 	}
 }
 
-func (repo *Repository) CreateOrUpdateSubscribe(userId int, subscribeQuery string) (models.Subscription, error) {
+func (repo *Repository) CreateSubscribe(userId int, subscribeQuery string) (models.Subscription, error) {
 	var sub models.Subscription
 
 	query := `
 		INSERT INTO subscriptions (telegram_id, search_text)
 		VALUES ($1, $2)
-		ON CONFLICT (telegram_id)
-		DO UPDATE SET 
-			search_text = EXCLUDED.search_text
 		RETURNING id, telegram_id, search_text;
 	`
 
@@ -40,11 +37,12 @@ func (repo *Repository) CreateOrUpdateSubscribe(userId int, subscribeQuery strin
 }
 
 func (repo *Repository) Subscriptions() ([]models.Subscription, error) {
+
 	var subscriptions []models.Subscription
 
 	query := `
 		SELECT search_text, telegram_id
-		FROM subscriptions
+		FROM subscriptions 
 	`
 
 	err := repo.db.Select(&subscriptions, query)
@@ -56,26 +54,23 @@ func (repo *Repository) Subscriptions() ([]models.Subscription, error) {
 	return subscriptions, nil
 }
 
-func (repo *Repository) Subscription(userId int) (models.Subscription, error) {
-	var subscription models.Subscription
+func (repo *Repository) SubscriptionsUser(userId int) ([]models.Subscription, error) {
+
+	var subscriptions []models.Subscription
 
 	query := `
-		SELECT search_text
-		FROM subscriptions
+		SELECT search_text, telegram_id
+		FROM subscriptions 
 		WHERE telegram_id = $1
 	`
 
-	err := repo.db.Get(&subscription, query, userId)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return models.Subscription{}, nil
-	}
+	err := repo.db.Select(&subscriptions, query, userId)
 
 	if err != nil {
-		return models.Subscription{}, fmt.Errorf("failed to get subscription from db: %w", err)
+		return nil, fmt.Errorf("failed to get subscriptions from db: %w", err)
 	}
 
-	return subscription, nil
+	return subscriptions, nil
 }
 
 func (repo *Repository) GetUserVacancies(userId int) ([]models.UserVacancy, error) {
@@ -170,4 +165,19 @@ func (repo *Repository) CreateUser(userId int) (models.User, error) {
 	}
 
 	return user, nil
+}
+
+func (repo *Repository) DeleteUserSubscriptions(userId int) error {
+
+	query := `
+		DELETE from subscriptions 
+		WHERE telegram_id = $1
+	`
+
+	_, err := repo.db.Exec(query, userId)
+	if err != nil {
+		return fmt.Errorf("failed to delete subscriptions for user %d: %w", userId, err)
+	}
+
+	return nil
 }

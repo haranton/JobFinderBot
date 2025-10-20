@@ -31,9 +31,16 @@ func (b *Bot) SendMessage(chatID int, text string) error {
 func (b *Bot) RegisterCommands() error {
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/setMyCommands", b.Token)
 
-	commands := []map[string]string{
-		{"command": "start", "description": "Регистрация пользователя"},
-		{"command": "help", "description": "Список команд"},
+	type Command struct {
+		Command     string `json:"command"`
+		Description string `json:"description"`
+	}
+
+	commands := []Command{
+		{Command: "start", Description: "Регистрация пользователя"},
+		{Command: "help", Description: "Список команд"},
+		{Command: "deletesubscribes", Description: "Удалить подписки"},
+		{Command: "subscribes", Description: "Посмотреть текущие подписки"},
 	}
 
 	body, err := json.Marshal(map[string]interface{}{
@@ -50,7 +57,9 @@ func (b *Bot) RegisterCommands() error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("telegram API returned status %d", resp.StatusCode)
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(resp.Body)
+		return fmt.Errorf("telegram API returned status %d: %s", resp.StatusCode, buf.String())
 	}
 
 	return nil

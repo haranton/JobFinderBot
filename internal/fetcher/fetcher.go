@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"tgbot/internal/dto"
+	"time"
 )
 
 const baseUrl = "https://api.hh.ru/vacancies"
@@ -16,7 +17,10 @@ type Fetcher struct {
 	client *http.Client
 }
 
-func NewFetcher(client *http.Client) *Fetcher {
+func NewFetcher() *Fetcher {
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
 	return &Fetcher{
 		client: client,
 	}

@@ -45,26 +45,32 @@ func RunMigrations(cfg *config.Config, logger *slog.Logger) {
 		os.Exit(1)
 	}
 
-	// Определяем путь к миграциям
 	migrationPath := cfg.MIGRATIONS_PATH
 	if cfg.ENV == "PRODUCTION" {
-		// В контейнере миграции лежат в /app/migrations
 		migrationPath = "/app/migrations"
-	} else if migrationPath == "" {
-		// Для локального запуска
-		migrationPath = "./migrations"
-	}
-
-	// Проверяем, существует ли папка
-	if _, err := os.Stat(migrationPath); os.IsNotExist(err) {
-		// Попробуем вычислить путь относительно исполняемого файла
+	} else {
+		// Находим корень проекта относительно исполняемого файла
 		ex, _ := os.Executable()
 		basePath := filepath.Dir(ex)
-		altPath := filepath.Join(basePath, "migrations")
-		if _, err2 := os.Stat(altPath); err2 == nil {
-			migrationPath = altPath
-		} else {
-			logger.Error("migrations folder not found", slog.String("checked_path", migrationPath))
+
+		// Проверяем несколько возможных путей
+		possiblePaths := []string{
+			filepath.Join(basePath, "migrations"),       // если бинарник рядом
+			filepath.Join(basePath, "..", "migrations"), // если запущен из /cmd
+			filepath.Join(".", "migrations"),            // если из корня проекта
+		}
+
+		found := false
+		for _, path := range possiblePaths {
+			if _, err := os.Stat(path); err == nil {
+				migrationPath = path
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			logger.Error("migrations folder not found", slog.String("searched_from", basePath))
 			os.Exit(1)
 		}
 	}

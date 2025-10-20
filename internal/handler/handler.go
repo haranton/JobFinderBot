@@ -31,8 +31,12 @@ func (h *Handler) HandleMessage(userId int, text string) {
 		h.handleStart(userId)
 	case strings.HasPrefix(text, "/find"):
 		h.handleFind(userId, text)
-	case strings.HasPrefix(text, "/subscribe"):
+	case text == "/subscribes":
+		h.handleSubscribes(userId)
+	case strings.HasPrefix(text, "/subscribe "):
 		h.handleSubscribe(userId, text)
+	case text == "/deletesubscribes":
+		h.handleDeleteSubscribes(userId)
 	case text == "/help":
 		h.handleHelp(userId)
 	default:
@@ -40,9 +44,46 @@ func (h *Handler) HandleMessage(userId int, text string) {
 	}
 }
 
+func (h *Handler) handleDeleteSubscribes(userId int) {
+	err := h.service.DeleteSubscribes(userId)
+	if err != nil {
+		h.bot.SendMessage(userId, "ошибка при удалении подписок")
+		return
+	}
+
+	h.bot.SendMessage(userId, "все подписки удалены успешно")
+
+}
+
+func (h *Handler) handleSubscribes(userId int) {
+	subscribes, err := h.service.SubscriptionsUser(userId)
+	if err != nil {
+		h.bot.SendMessage(userId, "ошибка при получении подписок")
+		return
+	}
+
+	if len(subscribes) == 0 {
+		h.bot.SendMessage(userId, "Подписки отсутствуют")
+		return
+	}
+
+	var msg string
+	for _, sub := range subscribes {
+		msg = msg + fmt.Sprintf("Подписка: %s\n", sub.SearchText)
+	}
+
+	h.bot.SendMessage(userId, msg)
+
+}
+
 func (h *Handler) handleSubscribe(userId int, subscribeCommandText string) {
 
 	subscribeText := strings.TrimPrefix(subscribeCommandText, "/subscribe")
+
+	if subscribeText == "" {
+		h.bot.SendMessage(userId, "не введены ключевые слова для подписки")
+		return
+	}
 	// сохраняем в бд user и chat id
 	subscribe, err := h.service.RegisterSubscribe(userId, subscribeText)
 
@@ -84,6 +125,11 @@ func (h *Handler) handleFind(userId int, text string) {
 
 	query := strings.TrimPrefix(text, "/find")
 
+	if query == "" {
+		h.bot.SendMessage(userId, "не введены ключевые слова для подписки")
+		return
+	}
+
 	vacancies, err := h.service.SearchVacancies(query, userId)
 	if err != nil {
 		log.Printf("Error getting vacancies: %v", err)
@@ -109,11 +155,10 @@ func (h *Handler) handleHelp(userId int) {
 		/start — регистрация пользователя  
 		/find <запрос> — поиск вакансий по ключевым словам  
 		/subscribe <запрос> — подписка на вакансии  
-		/help — показать это сообщение  
 
 		*Примеры:*
-		/find golang удаленно Ижевск
-		/subscribe python developer
+		/find golang Ижевск
+		/subscribe python developer удаленно
 		`
 
 	if err := h.bot.SendMessage(userId, helpText); err != nil {

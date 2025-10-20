@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"tgbot/internal/bot"
 	"tgbot/internal/config"
 	"tgbot/internal/db"
@@ -47,11 +51,7 @@ func main() {
 
 	// migrations
 	db.RunMigrations(config, logger)
-
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-	}
-	fetcher := fetcher.NewFetcher(client)
+	fetcher := fetcher.NewFetcher()
 
 	bot := &bot.Bot{Token: config.TOKEN}
 
@@ -63,30 +63,41 @@ func main() {
 	service := service.NewService(repo, fetcher)
 	handler := handler.NewHandler(service, bot)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
 	sender := sender.NewSender(service, bot)
-	sender.Start()
+	sender.Start(ctx)
 
 	offset := 0
+	jobs := make(chan Update, 50)
 
-	for {
-		updates, err := getUpdates(config.TOKEN, offset)
-		if err != nil {
-			log.Println("error get updates")
-			continue
-		}
-
-		for _, update := range updates {
-			id := update.UpdateID
-			text := update.Message.Text
-			username := update.Message.From.Username
-			chatID := update.Message.Chat.ID
-
-			handler.HandleMessage(chatID, text)
-			log.Printf("[%s] %s номер сообщения-%v", username, text, id)
-
-			offset = update.UpdateID + 1
-		}
+	for i := 0; i < config.WorkerCount; i++ {
+		go Worker(jobs, handler)
 	}
+
+	go func() {
+		for {
+			updates, err := getUpdates(config.TOKEN, offset)
+			if err != nil {
+				log.Println("error get updates")
+				continue
+			}
+
+			for _, update := range updates {
+				jobs <- update
+				offset = update.UpdateID + 1
+			}
+		}
+	}()
+
+	<-stop
+	cancel()
+	close(jobs)
+	time.Sleep(4 * time.Second)
 }
 
 func getUpdates(token string, offset int) ([]Update, error) {
@@ -110,4 +121,18 @@ func getUpdates(token string, offset int) ([]Update, error) {
 
 	return result.Result, nil
 
+}
+
+func Worker(jobs chan Update, handler *handler.Handler) {
+
+	for job := range jobs {
+
+		id := job.UpdateID
+		text := job.Message.Text
+		username := job.Message.From.Username
+		chatID := job.Message.Chat.ID
+
+		handler.HandleMessage(chatID, text)
+		log.Printf("[%s] %s номер сообщения-%v", username, text, id)
+	}
 }

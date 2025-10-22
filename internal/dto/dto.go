@@ -21,3 +21,17 @@ type Salary struct {
 	From int `json:"from"`
 	To   int `json:"to"`
 }
+
+type Update struct {
+	UpdateID int `json:"update_id"`
+	Message  struct {
+		MessageID int `json:"message_id"`
+		Chat      struct {
+			ID int `json:"id"`
+		} `json:"chat"`
+		Text string `json:"text"`
+		From struct {
+			Username string `json:"username"`
+		} `json:"from"`
+	} `json:"message"`
+}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 )
@@ -16,16 +17,25 @@ type BotClient interface {
 }
 
 type Bot struct {
-	Token string
+	Token   string
+	slogger *slog.Logger
 }
 
-func (b *Bot) SendMessage(chatID int, text string) error {
-	params := url.Values{}
-	params.Add("chat_id", fmt.Sprintf("%d", chatID))
-	params.Add("text", text)
+func NewBot(token string, logger *slog.Logger) *Bot {
+	return &Bot{
+		Token:   token,
+		slogger: logger,
+	}
+}
 
-	_, err := http.PostForm(fmt.Sprintf("%s%s/sendMessage", telegramAPI, b.Token), params)
-	return err
+func (b *Bot) SendMessage(userId int, text string) {
+	if err := b.sendMessage(userId, text); err != nil {
+		b.slogger.Error("Ошибка при отправке сообщения пользователю",
+			"userId", userId,
+			"text", text,
+			"error", err,
+		)
+	}
 }
 
 func (b *Bot) RegisterCommands() error {
@@ -60,6 +70,24 @@ func (b *Bot) RegisterCommands() error {
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(resp.Body)
 		return fmt.Errorf("telegram API returned status %d: %s", resp.StatusCode, buf.String())
+	}
+
+	return nil
+}
+
+func (b *Bot) sendMessage(chatID int, text string) error {
+	params := url.Values{}
+	params.Add("chat_id", fmt.Sprintf("%d", chatID))
+	params.Add("text", text)
+
+	resp, err := http.PostForm(fmt.Sprintf("%s%s/sendMessage", telegramAPI, b.Token), params)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("telegram API returned %d", resp.StatusCode)
 	}
 
 	return nil

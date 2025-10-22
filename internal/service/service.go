@@ -1,8 +1,10 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"strconv"
+
 	"tgbot/internal/dto"
 	"tgbot/internal/fetcher"
 	"tgbot/internal/models"
@@ -23,17 +25,18 @@ func NewService(repo *repo.Repository, fetcher *fetcher.Fetcher) *Service {
 //
 
 // Subscriptions возвращает все активные подписки
-func (s *Service) Subscriptions() ([]models.Subscription, error) {
-	return s.repo.Subscriptions()
+func (s *Service) Subscriptions(ctx context.Context) ([]models.Subscription, error) {
+	return s.repo.Subscriptions(ctx)
 }
 
-func (s *Service) SubscriptionsUser(telegramID int) ([]models.Subscription, error) {
-	return s.repo.SubscriptionsUser(telegramID)
+// SubscriptionsUser возвращает подписки конкретного пользователя
+func (s *Service) SubscriptionsUser(ctx context.Context, telegramID int) ([]models.Subscription, error) {
+	return s.repo.SubscriptionsUser(ctx, telegramID)
 }
 
 // RegisterSubscribe добавляет новую подписку для пользователя
-func (s *Service) RegisterSubscribe(telegramID int, query string) (models.Subscription, error) {
-	user, err := s.repo.GetUser(telegramID)
+func (s *Service) RegisterSubscribe(ctx context.Context, telegramID int, query string) (models.Subscription, error) {
+	user, err := s.repo.GetUser(ctx, telegramID)
 	if err != nil {
 		return models.Subscription{}, fmt.Errorf("failed to get user: %w", err)
 	}
@@ -41,7 +44,7 @@ func (s *Service) RegisterSubscribe(telegramID int, query string) (models.Subscr
 		return models.Subscription{}, fmt.Errorf("user not found: id=%d", telegramID)
 	}
 
-	sub, err := s.repo.CreateSubscribe(telegramID, query)
+	sub, err := s.repo.CreateSubscribe(ctx, telegramID, query)
 	if err != nil {
 		return models.Subscription{}, fmt.Errorf("failed to create subscription: %w", err)
 	}
@@ -53,9 +56,9 @@ func (s *Service) RegisterSubscribe(telegramID int, query string) (models.Subscr
 //
 
 // SearchVacancies ищет вакансии по запросу, фильтрует уже просмотренные и сохраняет новые
-func (s *Service) SearchVacancies(query string, telegramID int) ([]dto.Vacancy, error) {
-	// Получаем вакансии с hh.ru
-	hhVacancies, err := s.fetcher.Vacancies(query)
+func (s *Service) SearchVacancies(ctx context.Context, query string, telegramID int) ([]dto.Vacancy, error) {
+	// Получаем вакансии с hh.ru (fetcher может работать без ctx, если это обычный HTTP)
+	hhVacancies, err := s.fetcher.Vacancies(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch vacancies: %w", err)
 	}
@@ -71,7 +74,7 @@ func (s *Service) SearchVacancies(query string, telegramID int) ([]dto.Vacancy, 
 	}
 
 	// Получаем уже сохранённые вакансии пользователя
-	userVacancies, err := s.repo.GetUserVacancies(telegramID)
+	userVacancies, err := s.repo.GetUserVacancies(ctx, telegramID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user vacancies: %w", err)
 	}
@@ -80,7 +83,7 @@ func (s *Service) SearchVacancies(query string, telegramID int) ([]dto.Vacancy, 
 	newVacancies := filterNewVacancies(hhVacancies, userVacancies)
 
 	// Сохраняем вакансии для пользователя
-	if err := s.repo.SaveVacancies(telegramID, vacancies); err != nil {
+	if err := s.repo.SaveVacancies(ctx, telegramID, vacancies); err != nil {
 		return nil, fmt.Errorf("failed to save vacancies: %w", err)
 	}
 
@@ -92,8 +95,8 @@ func (s *Service) SearchVacancies(query string, telegramID int) ([]dto.Vacancy, 
 //
 
 // RegisterUser создаёт нового пользователя
-func (s *Service) RegisterUser(telegramID int) (models.User, error) {
-	user, err := s.repo.GetUser(telegramID)
+func (s *Service) RegisterUser(ctx context.Context, telegramID int) (models.User, error) {
+	user, err := s.repo.GetUser(ctx, telegramID)
 	if err != nil {
 		return models.User{}, fmt.Errorf("failed to get user: %w", err)
 	}
@@ -102,7 +105,7 @@ func (s *Service) RegisterUser(telegramID int) (models.User, error) {
 		return models.User{}, fmt.Errorf("user already exists: id=%d", telegramID)
 	}
 
-	newUser, err := s.repo.CreateUser(telegramID)
+	newUser, err := s.repo.CreateUser(ctx, telegramID)
 	if err != nil {
 		return models.User{}, fmt.Errorf("failed to create user: %w", err)
 	}
@@ -110,26 +113,26 @@ func (s *Service) RegisterUser(telegramID int) (models.User, error) {
 }
 
 // DeleteSubscribes удаляет все подписки пользователя
-func (s *Service) DeleteSubscribes(telegramID int) error {
-
-	isExist, err := s.userIsExist(telegramID)
-
+func (s *Service) DeleteSubscribes(ctx context.Context, telegramID int) error {
+	isExist, err := s.userIsExist(ctx, telegramID)
 	if err != nil {
 		return fmt.Errorf("failed check user exist %d: %w", telegramID, err)
 	}
 
 	if !isExist {
-		return fmt.Errorf("failed user dont exist %d: %w", telegramID, err)
+		return fmt.Errorf("user not exist %d", telegramID)
 	}
-	if err := s.repo.DeleteUserSubscriptions(telegramID); err != nil {
+
+	if err := s.repo.DeleteUserSubscriptions(ctx, telegramID); err != nil {
 		return fmt.Errorf("failed to delete subscriptions for user %d: %w", telegramID, err)
 	}
+
 	return nil
 }
 
-// UserIsExist проверяет, существует ли пользователь
-func (s *Service) userIsExist(telegramID int) (bool, error) {
-	user, err := s.repo.GetUser(telegramID)
+// userIsExist проверяет, существует ли пользователь
+func (s *Service) userIsExist(ctx context.Context, telegramID int) (bool, error) {
+	user, err := s.repo.GetUser(ctx, telegramID)
 	if err != nil {
 		return false, fmt.Errorf("failed to check user existence: %w", err)
 	}

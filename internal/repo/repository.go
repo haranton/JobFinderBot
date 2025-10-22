@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -14,12 +15,11 @@ type Repository struct {
 }
 
 func NewRepository(db *sqlx.DB) *Repository {
-	return &Repository{
-		db: db,
-	}
+	return &Repository{db: db}
 }
 
-func (repo *Repository) CreateSubscribe(userId int, subscribeQuery string) (models.Subscription, error) {
+// CreateSubscribe добавляет новую подписку для пользователя.
+func (repo *Repository) CreateSubscribe(ctx context.Context, userId int, subscribeQuery string) (models.Subscription, error) {
 	var sub models.Subscription
 
 	query := `
@@ -28,94 +28,93 @@ func (repo *Repository) CreateSubscribe(userId int, subscribeQuery string) (mode
 		RETURNING id, telegram_id, search_text;
 	`
 
-	err := repo.db.Get(&sub, query, userId, subscribeQuery)
-	if err != nil {
-		return models.Subscription{}, fmt.Errorf("failed to create or update subscription: %w", err)
+	if err := repo.db.GetContext(ctx, &sub, query, userId, subscribeQuery); err != nil {
+		return models.Subscription{}, fmt.Errorf("failed to create subscription: %w", err)
 	}
 
 	return sub, nil
 }
 
-func (repo *Repository) Subscriptions() ([]models.Subscription, error) {
-
+// Subscriptions возвращает все подписки из базы.
+func (repo *Repository) Subscriptions(ctx context.Context) ([]models.Subscription, error) {
 	var subscriptions []models.Subscription
 
 	query := `
 		SELECT search_text, telegram_id
-		FROM subscriptions 
+		FROM subscriptions
 	`
 
-	err := repo.db.Select(&subscriptions, query)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get subscriptions from db: %w", err)
+	if err := repo.db.SelectContext(ctx, &subscriptions, query); err != nil {
+		return nil, fmt.Errorf("failed to get subscriptions: %w", err)
 	}
 
 	return subscriptions, nil
 }
 
-func (repo *Repository) SubscriptionsUser(userId int) ([]models.Subscription, error) {
-
+// SubscriptionsUser возвращает подписки конкретного пользователя.
+func (repo *Repository) SubscriptionsUser(ctx context.Context, userId int) ([]models.Subscription, error) {
 	var subscriptions []models.Subscription
 
 	query := `
 		SELECT search_text, telegram_id
-		FROM subscriptions 
+		FROM subscriptions
 		WHERE telegram_id = $1
 	`
 
-	err := repo.db.Select(&subscriptions, query, userId)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get subscriptions from db: %w", err)
+	if err := repo.db.SelectContext(ctx, &subscriptions, query, userId); err != nil {
+		return nil, fmt.Errorf("failed to get subscriptions for user: %w", err)
 	}
 
 	return subscriptions, nil
 }
 
-func (repo *Repository) GetUserVacancies(userId int) ([]models.UserVacancy, error) {
-	var userVacancy []models.UserVacancy
+// GetUserVacancies возвращает вакансии, связанные с пользователем.
+func (repo *Repository) GetUserVacancies(ctx context.Context, userId int) ([]models.UserVacancy, error) {
+	var userVacancies []models.UserVacancy
+
 	query := `
-		SELECT vacancy_id from user_vacancies where telegram_id = $1
+		SELECT vacancy_id 
+		FROM user_vacancies 
+		WHERE telegram_id = $1
 	`
-	err := repo.db.Select(&userVacancy, query, userId)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get vacansies user from db, err: %w", err)
+
+	if err := repo.db.SelectContext(ctx, &userVacancies, query, userId); err != nil {
+		return nil, fmt.Errorf("failed to get user vacancies: %w", err)
 	}
 
-	return userVacancy, nil
+	return userVacancies, nil
 }
 
-func (repo *Repository) SaveVacancies(userId int, vacancies []models.Vacancy) error {
-	tx, err := repo.db.Beginx()
+// SaveVacancies сохраняет вакансии и их связи с пользователем в транзакции.
+func (repo *Repository) SaveVacancies(ctx context.Context, userId int, vacancies []models.Vacancy) error {
+	tx, err := repo.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 
+	// Если возникнет ошибка — откатываем транзакцию
 	defer func() {
 		if err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 		}
 	}()
 
 	for _, v := range vacancies {
 		// 1. Сохраняем вакансию (если нет — добавляем)
-		_, err = tx.Exec(`
+		if _, err = tx.ExecContext(ctx, `
 			INSERT INTO vacancies (id)
 			VALUES ($1)
 			ON CONFLICT (id) DO NOTHING
-		`, v.ID)
-		if err != nil {
+		`, v.ID); err != nil {
 			return fmt.Errorf("failed to insert vacancy: %w", err)
 		}
 
 		// 2. Сохраняем связь между пользователем и вакансией
-		_, err = tx.Exec(`
+		if _, err = tx.ExecContext(ctx, `
 			INSERT INTO user_vacancies (telegram_id, vacancy_id)
 			VALUES ($1, $2)
 			ON CONFLICT (telegram_id, vacancy_id) DO NOTHING
-		`, userId, v.ID)
-		if err != nil {
+		`, userId, v.ID); err != nil {
 			return fmt.Errorf("failed to link user and vacancy: %w", err)
 		}
 	}
@@ -127,7 +126,8 @@ func (repo *Repository) SaveVacancies(userId int, vacancies []models.Vacancy) er
 	return nil
 }
 
-func (repo *Repository) GetUser(userId int) (models.User, error) {
+// GetUser получает пользователя по telegram_id.
+func (repo *Repository) GetUser(ctx context.Context, userId int) (models.User, error) {
 	var user models.User
 
 	query := `
@@ -136,20 +136,19 @@ func (repo *Repository) GetUser(userId int) (models.User, error) {
 		WHERE telegram_id = $1
 	`
 
-	err := repo.db.Get(&user, query, userId)
-
+	err := repo.db.GetContext(ctx, &user, query, userId)
 	if errors.Is(err, sql.ErrNoRows) {
 		return models.User{}, nil
 	}
-
 	if err != nil {
-		return models.User{}, fmt.Errorf("failed to get user from db: %w", err)
+		return models.User{}, fmt.Errorf("failed to get user: %w", err)
 	}
 
 	return user, nil
 }
 
-func (repo *Repository) CreateUser(userId int) (models.User, error) {
+// CreateUser создаёт нового пользователя.
+func (repo *Repository) CreateUser(ctx context.Context, userId int) (models.User, error) {
 	var user models.User
 
 	query := `
@@ -159,25 +158,30 @@ func (repo *Repository) CreateUser(userId int) (models.User, error) {
 		RETURNING telegram_id, created_at
 	`
 
-	err := repo.db.Get(&user, query, userId)
-	if err != nil {
+	if err := repo.db.GetContext(ctx, &user, query, userId); err != nil {
 		return models.User{}, fmt.Errorf("failed to create user: %w", err)
 	}
 
 	return user, nil
 }
 
-func (repo *Repository) DeleteUserSubscriptions(userId int) error {
-
+// DeleteUserSubscriptions удаляет все подписки пользователя.
+func (repo *Repository) DeleteUserSubscriptions(ctx context.Context, userId int) error {
 	query := `
-		DELETE from subscriptions 
+		DELETE FROM subscriptions 
 		WHERE telegram_id = $1
 	`
 
-	_, err := repo.db.Exec(query, userId)
-	if err != nil {
+	if _, err := repo.db.ExecContext(ctx, query, userId); err != nil {
 		return fmt.Errorf("failed to delete subscriptions for user %d: %w", userId, err)
 	}
 
+	return nil
+}
+
+func (r *Repository) Close() error {
+	if r.db != nil {
+		return r.db.Close()
+	}
 	return nil
 }

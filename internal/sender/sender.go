@@ -3,7 +3,7 @@ package sender
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"tgbot/internal/bot"
 	"tgbot/internal/service"
 	"time"
@@ -12,17 +12,19 @@ import (
 type Sender struct {
 	service *service.Service
 	bot     *bot.Bot
+	slogger *slog.Logger
 }
 
-func NewSender(service *service.Service, bot *bot.Bot) *Sender {
+func NewSender(service *service.Service, bot *bot.Bot, slogger *slog.Logger) *Sender {
 	return &Sender{
 		service: service,
 		bot:     bot,
+		slogger: slogger,
 	}
 }
 
 func (s *Sender) Start(ctx context.Context) {
-	log.Println("sender is start")
+	s.slogger.Info("sender is start")
 
 	go s.checkSendMessage(ctx)
 
@@ -36,7 +38,7 @@ func (s *Sender) checkSendMessage(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("sender stopped by context")
+			s.slogger.Info("sender stopped by context")
 			return
 		case <-ticker.C:
 			go s.sendMessages(ctx)
@@ -45,25 +47,25 @@ func (s *Sender) checkSendMessage(ctx context.Context) {
 }
 
 func (s *Sender) sendMessages(ctx context.Context) {
-	log.Println("sender send message")
+	s.slogger.Info("sender send message")
 
-	subscriptions, err := s.service.Subscriptions()
+	subscriptions, err := s.service.Subscriptions(ctx)
 	if err != nil {
-		log.Println("error fetching subscriptions:", err)
+		s.slogger.Info("error fetching subscriptions:", "error", err)
 		return
 	}
 
 	for _, sub := range subscriptions {
 		select {
 		case <-ctx.Done():
-			log.Println("sendMessages canceled by context")
+			s.slogger.Info("sendMessages canceled by context")
 			return
 		default:
 		}
 
-		vacancies, err := s.service.SearchVacancies(sub.SearchText, int(sub.TelegramID))
+		vacancies, err := s.service.SearchVacancies(ctx, sub.SearchText, int(sub.TelegramID))
 		if err != nil {
-			log.Println("error searching vacancies:", err)
+			s.slogger.Info("error searching vacancies:", "error", err)
 			continue
 		}
 

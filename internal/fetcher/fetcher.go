@@ -1,6 +1,7 @@
 package fetcher
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,7 +27,7 @@ func NewFetcher() *Fetcher {
 	}
 }
 
-func (f *Fetcher) Vacancies(userInput string) ([]dto.Vacancy, error) {
+func (f *Fetcher) Vacancies(ctx context.Context, userInput string) ([]dto.Vacancy, error) {
 	searchQuery := buildSearchQuery(userInput)
 
 	params := url.Values{}
@@ -38,10 +39,17 @@ func (f *Fetcher) Vacancies(userInput string) ([]dto.Vacancy, error) {
 	page := 0
 
 	for {
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
 		params.Set("page", fmt.Sprintf("%d", page))
 		fullURL := baseUrl + "?" + params.Encode()
 
-		req, err := http.NewRequest(http.MethodGet, fullURL, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create request: %w", err)
 		}

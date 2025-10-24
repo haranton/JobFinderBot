@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"tgbot/internal/bot"
+	botTg "tgbot/internal/bot"
 	"tgbot/internal/config"
 	"tgbot/internal/db"
 	"tgbot/internal/dto"
@@ -23,7 +24,7 @@ type App struct {
 	cfg        *config.Config
 	logger     *slog.Logger
 	repo       *repo.Repository
-	bot        *bot.Bot
+	bot        *botTg.Bot
 	svc        *service.Service
 	sender     *sender.Sender
 	fetcher    *fetcher.Fetcher
@@ -40,7 +41,7 @@ func New(cfg *config.Config, slogger *slog.Logger) (*App, error) {
 
 	rep := repo.NewRepository(dbConn)
 	f := fetcher.NewFetcher()
-	b := &bot.Bot{Token: cfg.TOKEN}
+	b := botTg.NewBot(cfg.TOKEN, slogger)
 	if err := b.RegisterCommands(); err != nil {
 		return nil, err
 	}

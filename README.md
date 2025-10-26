@@ -17,7 +17,7 @@ Features
 Управление миграциями через golang-migrate
 
 Project Structure
-text
+```text
 tgbot/
 ├── cmd/
 │   └── main.go                 # Точка входа
@@ -33,6 +33,7 @@ tgbot/
 │   ├── sender/                # Отправка уведомлений пользователям
 │   └── service/               # Бизнес-логика
 └── migrations/                # SQL миграции
+```
 Bot Commands
 Команда	Описание
 /start	Регистрация пользователя
